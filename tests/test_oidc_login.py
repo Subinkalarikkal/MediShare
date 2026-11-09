@@ -99,3 +99,18 @@ def test_demo_mode_seeds_empty_database_and_shows_banner(monkeypatch, tmp_path):
     at.switch_page("app_pages/login.py").run()
     assert at.selectbox and any(b.label == "Sign in" for b in at.button)
     connection.get_engine().dispose()
+
+
+def test_committed_demo_profile(monkeypatch):
+    """The committed profile turns on the public demo, but production settings always win."""
+    from config import Settings
+    for k in ("APP_ENV", "AUTH_MODE", "DEMO_MODE", "MEDISHARE_PROFILE"):
+        monkeypatch.delenv(k, raising=False)
+    s = Settings()
+    assert (s.app_env, s.auth_mode, s.demo_mode, s.dev_login_enabled) == ("demo", "dev", True, True)
+    monkeypatch.setenv("APP_ENV", "production")
+    s = Settings()
+    assert s.demo_mode is False and s.dev_login_enabled is False
+    monkeypatch.setenv("MEDISHARE_PROFILE", "none")
+    monkeypatch.delenv("APP_ENV")
+    assert Settings().auth_mode == "oidc"

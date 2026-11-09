@@ -12,6 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("APP_ENV", "test")
+os.environ["MEDISHARE_PROFILE"] = "none"  # tests never use the committed demo profile
 os.environ["ANTHROPIC_API_KEY"] = ""  # never call the real API from tests
 
 from PIL import Image, ImageDraw  # noqa: E402

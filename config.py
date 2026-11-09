@@ -20,8 +20,29 @@ except Exception:  # pragma: no cover
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def _profile() -> dict:
+    """Non-secret deployment profile committed with the code (lowest priority).
+
+    `medishare_profile.toml` makes the public demo work on Streamlit Cloud without any
+    secrets. Environment variables and Streamlit secrets always override it, and
+    MEDISHARE_PROFILE=none disables it (used by the test suite).
+    """
+    if os.getenv("MEDISHARE_PROFILE", "").lower() == "none":
+        return {}
+    path = BASE_DIR / "medishare_profile.toml"
+    if not path.exists():
+        return {}
+    try:
+        import tomllib
+
+        return {k: str(v).lower() if isinstance(v, bool) else str(v)
+                for k, v in tomllib.loads(path.read_text(encoding="utf-8")).items()}
+    except Exception:
+        return {}
+
+
 def _secret(name: str, default: str | None = None) -> str | None:
-    """Read a setting from env first, then Streamlit secrets (if available)."""
+    """Read a setting from env, then Streamlit secrets, then the committed profile."""
     value = os.getenv(name)
     if value not in (None, ""):
         return value
@@ -32,7 +53,7 @@ def _secret(name: str, default: str | None = None) -> str | None:
             return str(st.secrets[name])
     except Exception:
         pass
-    return default
+    return _profile().get(name, default)
 
 
 def _bool(name: str, default: bool = False) -> bool:
