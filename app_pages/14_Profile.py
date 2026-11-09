@@ -30,3 +30,24 @@ with db() as s:
                 f"({u.professional_council or '—'}) · {'Verified' if u.professional_verified else 'Not yet verified'}")
     st.caption("Email and roles are managed through your sign-in provider and administrators. Your data is used only "
                "to coordinate collection and disposal; see the Safety page for details.")
+
+st.subheader("Login & security")
+from services import password_service  # noqa: E402
+
+with db() as s:
+    u = user_service.get_profile(s, a)
+    has_pw = bool(u.password_hash)
+    st.caption(f"Username: **{u.username or 'not set'}** · Password: **{'set' if has_pw else 'not set'}** · "
+               "You can always sign in with an emailed code as well.")
+    with st.form("username_form"):
+        new_username = st.text_input("Username", u.username or "",
+                                     help="3–30 characters: lowercase letters, numbers, dots, underscores")
+        if st.form_submit_button("Save username"):
+            act(s, password_service.set_username, new_username, success="Username saved")
+    with st.form("password_form", clear_on_submit=True):
+        current = st.text_input("Current password", type="password") if has_pw else None
+        new_pw = st.text_input("New password", type="password", help="At least 10 characters, with letters and numbers")
+        confirm_pw = st.text_input("Confirm new password", type="password")
+        if st.form_submit_button("Change password" if has_pw else "Set password", type="primary"):
+            act(s, password_service.set_password, new_pw, confirm_pw, current,
+                success="Password changed" if has_pw else "Password set")

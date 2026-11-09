@@ -12,12 +12,12 @@ risk range (0–100) · indexes on foreign keys, statuses and lookup columns.
 ### Authentication and access
 | Table | Purpose / key columns |
 |---|---|
-| `users` | email (unique), name, phone, location, district, PIN, status (PENDING/ACTIVE/SUSPENDED/DEACTIVATED), organization_id, professional_registration_number/council/verified, last_login_at, password_hash (Argon2id, unused with OIDC) |
+| `users` | email (unique), username (unique, optional), name, phone, location, district, PIN, status (PENDING/ACTIVE/SUSPENDED/DEACTIVATED), organization_id, professional_registration_number/council/verified, last_login_at, password_hash (Argon2id, unused with OIDC) |
 | `roles` | 7 role codes |
 | `permissions` | permission codes (`utils/constants.Perm`) |
 | `user_roles` | user ↔ role (unique pair), assigned_by |
 | `role_permissions` | role ↔ permission (unique pair) |
-| `email_login_codes` | one-time sign-in codes: email, salted SHA-256 hash, expiry, attempts, consumed_at |
+| `email_login_codes` | one-time codes (purpose `login` or `reset`): email, salted SHA-256 hash, expiry, attempts, consumed_at |
 | `login_events` | LOGIN_SUCCESS, LOGIN_UNREGISTERED, LOGIN_DENIED_*, LOGOUT, SESSION_EXPIRED |
 
 ### Organizations

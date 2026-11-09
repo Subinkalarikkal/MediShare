@@ -52,8 +52,8 @@ def email_code_login() -> None:
         return
     pending = st.session_state.get("otp_email")
     if not pending:
-        st.write("Enter your email address. We'll send you a 6-digit code to confirm it's really you – "
-                 "no password needed.")
+        st.write("Enter your email address and we'll send you a 6-digit code. **New to MediShare?** "
+                 "Use this to create your account – we verify your email first.")
         with st.form("otp_request"):
             email = st.text_input("Email address", placeholder="you@example.com")
             sent = st.form_submit_button("Send verification code", type="primary", icon=":material/mail:")
@@ -86,15 +86,7 @@ def email_code_login() -> None:
             st.error(str(exc))
             return
         st.session_state.pop("otp_email", None)
-        if res.outcome in {"OK", "PENDING"}:
-            start_session(res.actor.user_id, res.actor.email, "email")
-            st.rerun()
-        elif res.outcome == "UNREGISTERED":
-            st.session_state["signup_email"] = verified
-            st.session_state["signup_verified"] = True  # email ownership proven by the code
-            st.rerun()
-        else:
-            st.error(res.message)
+        _start_or_signup(res, verified, "email")
     c1, c2 = st.columns(2)
     if c1.button("Send a new code"):
         try:
@@ -110,7 +102,94 @@ def email_code_login() -> None:
         st.rerun()
 
 
-SUBTITLE = {"email": "Secure sign-in with a one-time code sent to your email",
+def _start_or_signup(res, verified_email: str, provider: str) -> None:
+    if res.outcome in {"OK", "PENDING"}:
+        start_session(res.actor.user_id, res.actor.email, provider)
+        st.rerun()
+    elif res.outcome == "UNREGISTERED":
+        st.session_state["signup_email"] = verified_email
+        st.session_state["signup_verified"] = True  # email ownership proven by the code
+        st.rerun()
+    else:
+        st.error(res.message)
+
+
+def password_login() -> None:
+    from services import password_service as ps
+    from services.errors import ValidationError
+
+    with st.form("pw_login"):
+        ident = st.text_input("Username or email", placeholder="username or you@example.com")
+        pw = st.text_input("Password", type="password")
+        go = st.form_submit_button("Sign in", type="primary", icon=":material/login:")
+    if go:
+        try:
+            with db() as s:
+                res = ps.login_with_password(s, ident, pw)
+        except ps.LoginLocked as exc:
+            st.error(str(exc))
+            return
+        except ValidationError:
+            st.error(ps.GENERIC_FAIL)
+            return
+        _start_or_signup(res, "", "password")
+    st.caption("Forgot your password? Use the **Forgot password** tab. No password yet? Sign in with an "
+               "**Email code**, then set one under Profile → Login & security.")
+
+
+def forgot_password() -> None:
+    from services import email_auth_service as eas
+    from services import email_service
+    from services import password_service as ps
+    from services.errors import ValidationError
+
+    if not email_service.is_configured():
+        st.error("Password reset is temporarily unavailable. Please try again later.")
+        return
+    pending = st.session_state.get("reset_email")
+    if not pending:
+        st.write("Enter the email address of your account. We'll email you a code to set a new password.")
+        with st.form("reset_request"):
+            email = st.text_input("Account email", placeholder="you@example.com")
+            sent = st.form_submit_button("Send reset code", type="primary", icon=":material/lock_reset:")
+        if sent:
+            try:
+                with db() as s:
+                    ps.request_reset(s, email)
+                st.session_state["reset_email"] = email.strip().lower()
+                st.rerun()
+            except ValidationError:
+                st.error("Please enter a valid email address.")
+            except eas.RateLimited as exc:
+                st.error(str(exc))
+            except (email_service.EmailNotConfigured, email_service.EmailSendError):
+                log.exception("Could not send reset email")
+                st.error("We couldn't send the email right now. Please try again in a few minutes.")
+        return
+    st.success(f"If an account exists for **{pending}**, we've emailed it a reset code (valid for 10 minutes).")
+    with st.form("reset_verify"):
+        code = st.text_input("Reset code", max_chars=6, placeholder="123456")
+        new = st.text_input("New password", type="password",
+                            help=f"At least {ps.MIN_LENGTH} characters, with letters and numbers.")
+        confirm = st.text_input("Confirm new password", type="password")
+        done = st.form_submit_button("Set new password", type="primary")
+    if done:
+        try:
+            with db() as s:
+                ps.reset_password(s, pending, code, new, confirm)
+            st.session_state.pop("reset_email", None)
+            st.session_state["reset_done"] = True
+            st.rerun()
+        except eas.CodeInvalid as exc:
+            st.error(str(exc))
+        except ValidationError as exc:
+            st.error("\n".join(f"- {e}" for e in exc.errors))
+    if st.button("Start over", key="reset_restart"):
+        st.session_state.pop("reset_email", None)
+        st.rerun()
+
+
+SUBTITLE = {"email": "Sign in with your password or a one-time code sent to your email",
             "oidc": "Secure sign-in with your Google account"}
 page_header("Sign in to MediShare", SUBTITLE.get(settings.auth_mode, "Development sign-in"))
 
@@ -120,7 +199,15 @@ if err := st.session_state.pop("login_error", None):
 col, side = st.columns([3, 2])
 with col:
     if settings.auth_mode == "email":
-        email_code_login()
+        if st.session_state.pop("reset_done", False):
+            st.success("Your password has been changed. Sign in with your new password.")
+        pw_tab, code_tab, reset_tab = st.tabs(["Password", "Email code / New account", "Forgot password"])
+        with pw_tab:
+            password_login()
+        with code_tab:
+            email_code_login()
+        with reset_tab:
+            forgot_password()
     elif settings.auth_mode == "oidc":
         st.write("MediShare uses Google sign-in (OpenID Connect). We only receive your verified email and name.")
         ready, problem = oidc_ready(settings.oidc_provider)

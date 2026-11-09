@@ -6,6 +6,13 @@
   compared in constant time, expire after 10 minutes, are single-use (requesting a new code invalidates older
   ones), lock after 5 wrong attempts, and are rate-limited to 3 per 15 minutes / 10 per day per address. Sign-up
   is only possible after verification – the onboarding page refuses any email not verified in this session.
+* **Username/email + password** (same `AUTH_MODE=email` page): Argon2id hashes (t=3, m=64 MiB, p=4, rehashed
+  when parameters change); minimum 10 characters with letters and numbers, common passwords and passwords
+  containing the email name/username refused. Identical error for unknown user vs wrong password, with equal
+  hashing work. 5 failures in 15 minutes lock password sign-in for that account for 15 minutes (email-code sign-in
+  still works). Changing a password requires the current one; every change triggers a notification email.
+* **Forgot password**: a separate one-time *reset* code (codes for sign-in and reset are not interchangeable) is
+  emailed only if the account exists; the page shows the same message either way.
 * **OIDC (Google) via `st.login`** (`AUTH_MODE=oidc`) is also supported. The provider's verified email is mapped to
   a database user (`auth_service.resolve_login`); unverified provider emails are refused.
 * Authentication ≠ authorization: a successful login grants nothing beyond the user's database roles; new

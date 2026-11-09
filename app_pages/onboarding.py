@@ -36,6 +36,12 @@ with st.form("signup"):
         st.markdown("**Professional credentials** (verified by an administrator before review access is enabled)")
         reg_no = st.text_input("Pharmacist / professional registration number *")
         council = st.text_input("Registering council *", "Kerala State Pharmacy Council")
+    st.markdown("**Sign-in details** – you can sign in with this username (or your email) and password, or "
+                "with an emailed code.")
+    u1, u2, u3 = st.columns(3)
+    username = u1.text_input("Username *", help="3–30 characters: lowercase letters, numbers, dots, underscores")
+    password = u2.text_input("Password *", type="password", help="At least 10 characters, with letters and numbers")
+    password2 = u3.text_input("Confirm password *", type="password")
     agree = st.checkbox("I understand MediShare is for authorized collection, disposal and documented coordination "
                         "only, and is not a medicine marketplace.")
     submitted = st.form_submit_button("Create account", type="primary")
@@ -48,7 +54,8 @@ if submitted:
                 user = auth_service.register_user(
                     s, email=email, full_name=full_name, account_type=account_type, phone=phone or None,
                     location=location, district=district, pin_code=pin or None,
-                    professional_registration_number=reg_no, professional_council=council)
+                    professional_registration_number=reg_no, professional_council=council,
+                    username=username, password=password, password_confirm=password2)
                 uid, uemail = user.id, user.email
             start_session(uid, uemail, get_settings().auth_mode)
             st.rerun()

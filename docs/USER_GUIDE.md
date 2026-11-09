@@ -1,7 +1,14 @@
 # MediShare User Guide
 
 ## Signing in
-Use **Sign in with Google**. First-time users choose an account type. Individuals can start immediately;
+The Login page has three tabs:
+* **Password** – your username (or email) and password.
+* **Email code / New account** – we email you a 6-digit code. New users create their account this way: after the
+  code is verified you choose an account type, a username and a password.
+* **Forgot password** – we email a reset code; enter it with a new password.
+
+Existing accounts without a password can sign in with an email code and set a username and password under
+**Profile → Login & security**. First-time users choose an account type. Individuals can start immediately;
 organization, collection-centre and reviewer accounts stay **restricted** until an administrator reviews them.
 
 ## Individuals (households)

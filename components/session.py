@@ -102,7 +102,7 @@ def act(s: Session, fn: Callable, *args, success: str | None = None, rerun: bool
     try:
         result = fn(s, a, *args, **kwargs)
         s.commit()
-    except (ServiceError, IntegrityError) as exc:
+    except (ServiceError, ValidationError, IntegrityError) as exc:
         s.rollback()
         st.error(_error_message(exc))
         return None
@@ -124,6 +124,6 @@ def guarded(fn: Callable, *args, **kwargs):
     """Run a read-only service call and render permission / not-found errors."""
     try:
         return fn(*args, **kwargs)
-    except (ServiceError, IntegrityError) as exc:
+    except (ServiceError, ValidationError, IntegrityError) as exc:
         st.error(_error_message(exc))
         st.stop()

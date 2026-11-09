@@ -41,8 +41,8 @@ class LoginResult:
 
 
 def hash_password(password: str) -> str:
-    if len(password) < 12:
-        raise ValidationError("Password must be at least 12 characters.")
+    if len(password) < 10:
+        raise ValidationError("Password must be at least 10 characters.")
     return _hasher.hash(password)
 
 
@@ -114,7 +114,9 @@ def _assign_role(session: Session, user: User, role_code: str, assigned_by=None)
 def register_user(session: Session, *, email: str, full_name: str, account_type: str,
                   phone: str | None = None, location: str | None = None, district: str | None = None,
                   pin_code: str | None = None, professional_registration_number: str | None = None,
-                  professional_council: str | None = None, is_sample: bool = False) -> User:
+                  professional_council: str | None = None, is_sample: bool = False,
+                  username: str | None = None, password: str | None = None,
+                  password_confirm: str | None = None) -> User:
     """Self-registration after OIDC authentication.
 
     Individuals become ACTIVE immediately. Organization and reviewer accounts
@@ -138,6 +140,12 @@ def register_user(session: Session, *, email: str, full_name: str, account_type:
     raise_if(errors)
     if get_user_by_email(session, norm_email):
         raise ValidationError("An account already exists for this email.")
+    password_hash = None
+    if username is not None or password is not None:
+        from services import password_service
+        username = password_service.validate_username(session, username or "")
+        password_service._check_new_password(password or "", password_confirm, norm_email, username)
+        password_hash = hash_password(password)
     status = (AccountStatus.ACTIVE.value if account_type == RoleCode.INDIVIDUAL.value
               else AccountStatus.PENDING.value)
     user = User(
@@ -145,6 +153,7 @@ def register_user(session: Session, *, email: str, full_name: str, account_type:
         district=district, pin_code=pin_code, status=status,
         professional_registration_number=clean_text(professional_registration_number, 100),
         professional_council=clean_text(professional_council, 200), is_sample=is_sample,
+        username=username, password_hash=password_hash,
     )
     session.add(user)
     session.flush()

@@ -175,13 +175,13 @@ def _login() -> AppTest:
 
 
 def _request(at: AppTest, email: str) -> AppTest:
-    at.text_input[0].input(email)
+    next(t for t in at.text_input if t.label == "Email address").input(email)
     next(b for b in at.button if b.label == "Send verification code").click().run()
     return at
 
 
 def _verify(at: AppTest, code: str) -> AppTest:
-    at.text_input[0].input(code)
+    next(t for t in at.text_input if t.label == "Verification code").input(code)
     next(b for b in at.button if b.label == "Verify and sign in").click().run()
     return at
 
@@ -191,7 +191,7 @@ def test_ui_no_account_picker_or_unverified_signup(email_mode):
     assert not at.exception
     labels = [b.label for b in at.button]
     assert "Send verification code" in labels
-    assert "Sign in" not in labels and "Continue to sign-up" not in labels and not at.selectbox
+    assert "Continue to sign-up" not in labels and not at.selectbox  # no demo picker / unverified sign-up
 
 
 def test_ui_new_user_must_verify_before_signup(email_mode):
@@ -205,7 +205,11 @@ def test_ui_new_user_must_verify_before_signup(email_mode):
     assert not at.exception
     assert at.session_state["signup_verified"] is True
     assert any("Verified email: brand.new@example.org" in m.value for m in at.markdown)
-    at.text_input[0].input("Brand New")
+    f = {t.label: t for t in at.text_input}
+    f["Full name *"].input("Brand New")
+    f["Username *"].input("brand.new")
+    f["Password *"].input("Brandnew2026ok")
+    f["Confirm password *"].input("Brandnew2026ok")
     at.checkbox[0].check()
     next(b for b in at.button if b.label == "Create account").click().run()
     assert not at.exception
@@ -235,4 +239,7 @@ def test_ui_smtp_not_configured_is_friendly(email_mode, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     at = _login()
     assert not at.exception
-    assert [e.value for e in at.error] == ["Sign-in is temporarily unavailable. Please try again later or use the Contact page."]
+    assert [e.value for e in at.error] == [
+        "Sign-in is temporarily unavailable. Please try again later or use the Contact page.",  # email-code tab
+        "Password reset is temporarily unavailable. Please try again later."]  # forgot-password tab
+    assert any(b.label == "Sign in" for b in at.button)  # password sign-in still works without email
