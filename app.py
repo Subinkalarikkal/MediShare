@@ -21,30 +21,16 @@ settings = get_settings()
 
 
 @st.cache_resource(show_spinner=False)
-def _bootstrap() -> bool:
-    # Production schema is managed by Alembic migrations; create_all is a dev/test convenience.
-    if settings.is_production:
-        from pathlib import Path
+def _bootstrap(schema_head: str, db_url: str) -> bool:
+    """Bring the database schema up to date, seed reference data and the first admin.
 
-        from alembic import command
-        from alembic.config import Config
+    Cached per (latest migration, database URL): when a deploy adds a migration, a
+    long-running server re-runs this automatically instead of keeping a stale schema.
+    """
+    from database.migrations import run_migrations
 
-        root = Path(__file__).resolve().parent
-        cfg = Config(str(root / "alembic.ini"))
-        cfg.set_main_option("script_location", str(root / "alembic"))
-        from sqlalchemy import inspect
-
-        from database.connection import get_engine
-
-        tables = set(inspect(get_engine()).get_table_names())
-        if "users" in tables and "alembic_version" not in tables:
-            # Schema was created without Alembic (older version / create_all): adopt it, don't re-create it.
-            from database.models import Base
-
-            complete = set(Base.metadata.tables) <= tables
-            command.stamp(cfg, "head" if complete else "964a65b7ecac")
-        command.upgrade(cfg, "head")
-    init_db(create_all=not settings.is_production)
+    run_migrations()
+    init_db(create_all=False)
     _bootstrap_first_admin()
     return True
 
@@ -95,7 +81,10 @@ def _ensure_demo_data() -> None:
     st.session_state["_demo_data_checked"] = True
 
 
-_bootstrap()
+from database.connection import get_engine  # noqa: E402
+from database.migrations import head_revision  # noqa: E402
+
+_bootstrap(head_revision(), get_engine().url.render_as_string(hide_password=True))
 _ensure_demo_data()
 apply_theme()
 if settings.demo_mode:
@@ -230,4 +219,10 @@ def build_pages(a) -> dict[str, list[st.Page]]:
 render_sidebar(actor)
 show_flash()
 navigation = st.navigation(build_pages(actor))
-navigation.run()
+try:
+    navigation.run()
+except Exception:  # never show tracebacks to visitors; details go to the server log only
+    import logging
+
+    logging.getLogger("medishare").exception("Unhandled error on page %s", getattr(navigation, "title", "?"))
+    st.error("Something went wrong on this page. Please try again; if it keeps happening, use the Contact page.")

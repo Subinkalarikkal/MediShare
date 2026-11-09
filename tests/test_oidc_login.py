@@ -115,3 +115,17 @@ def test_committed_profile_is_production_with_email_verification(monkeypatch):
     assert s.database_url.endswith("/medishare.db")  # never the dev/demo database with SAMPLE data
     monkeypatch.setenv("AUTH_MODE", "dev")  # even if someone sets dev login, production refuses it
     assert Settings().dev_login_enabled is False
+
+
+def test_unexpected_page_error_shows_friendly_message(monkeypatch):
+    """Any unhandled page error is caught: visitors see a friendly message, never a traceback."""
+    from services import analytics_service
+
+    def boom(*a, **k):
+        raise RuntimeError("database exploded with secret details")
+    monkeypatch.setattr(analytics_service, "public_stats", boom)
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    assert not at.exception
+    msgs = [e.value for e in at.error]
+    assert any("Something went wrong on this page" in m for m in msgs)
+    assert not any("secret details" in m for m in msgs)

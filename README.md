@@ -47,7 +47,7 @@ OCR (Tesseract) and deterministic database answers are used, and the UI says so.
 ## Tests
 
 ```bash
-python -m pytest            # 247 tests: services, safety acceptance, AI, migrations, Streamlit AppTest UI
+python -m pytest            # 250 tests: services, safety acceptance, AI, migrations, Streamlit AppTest UI
 ```
 
 ## Project layout
