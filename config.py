@@ -56,6 +56,13 @@ def _secret(name: str, default: str | None = None) -> str | None:
     return _profile().get(name, default)
 
 
+def _default_sqlite_url() -> str:
+    # Production never shares a database file with dev/demo data (which contains SAMPLE records).
+    production = (_secret("APP_ENV", "development") or "").lower() == "production"
+    name = "medishare.db" if production else "medishare_dev.db"
+    return f"sqlite:///{(BASE_DIR / name).as_posix()}"
+
+
 def _bool(name: str, default: bool = False) -> bool:
     raw = _secret(name)
     if raw is None:
@@ -66,11 +73,7 @@ def _bool(name: str, default: bool = False) -> bool:
 @dataclass(frozen=True)
 class Settings:
     app_env: str = field(default_factory=lambda: _secret("APP_ENV", "development"))
-    database_url: str = field(
-        default_factory=lambda: _secret(
-            "DATABASE_URL", f"sqlite:///{(BASE_DIR / 'medishare_dev.db').as_posix()}"
-        )
-    )
+    database_url: str = field(default_factory=lambda: _secret("DATABASE_URL", _default_sqlite_url()))
     anthropic_api_key: str | None = field(default_factory=lambda: _secret("ANTHROPIC_API_KEY"))
     claude_model: str = field(default_factory=lambda: _secret("CLAUDE_MODEL", "claude-opus-5-5"))
     ai_external_processing_enabled: bool = field(
@@ -87,14 +90,20 @@ class Settings:
     email_provider_api_key: str | None = field(
         default_factory=lambda: _secret("EMAIL_PROVIDER_API_KEY")
     )
-    # "oidc" uses Streamlit's st.login; "dev" enables the clearly-labelled
-    # demo login selector (refused when APP_ENV=production).
+    # "email" = one-time code sent by email; "oidc" = Streamlit st.login (Google);
+    # "dev" = clearly-labelled local demo login selector (refused when APP_ENV=production).
     auth_mode: str = field(default_factory=lambda: _secret("AUTH_MODE", "oidc"))
     oidc_provider: str = field(default_factory=lambda: _secret("OIDC_PROVIDER", "google"))
     session_timeout_minutes: int = field(
         default_factory=lambda: int(_secret("SESSION_TIMEOUT_MINUTES", "60"))
     )
     max_upload_mb: int = field(default_factory=lambda: int(_secret("MAX_UPLOAD_MB", "8")))
+    smtp_host: str | None = field(default_factory=lambda: _secret("SMTP_HOST"))
+    smtp_port: int = field(default_factory=lambda: int(_secret("SMTP_PORT", "587")))
+    smtp_user: str | None = field(default_factory=lambda: _secret("SMTP_USER"))
+    smtp_password: str | None = field(default_factory=lambda: _secret("SMTP_PASSWORD"))
+    smtp_from: str | None = field(default_factory=lambda: _secret("SMTP_FROM"))
+    smtp_use_ssl: bool = field(default_factory=lambda: _bool("SMTP_USE_SSL", False))
     bootstrap_super_admin_email: str | None = field(
         default_factory=lambda: _secret("BOOTSTRAP_SUPER_ADMIN_EMAIL")
     )
@@ -102,6 +111,10 @@ class Settings:
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def smtp_enabled(self) -> bool:
+        return bool(self.smtp_host and (self.smtp_from or self.smtp_user))
 
     @property
     def dev_login_enabled(self) -> bool:

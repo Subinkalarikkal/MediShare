@@ -7,7 +7,7 @@ PostgreSQL (production) / SQLite (dev & tests). Defined in `database/models.py`;
 demonstration data · CHECK constraints for quantities (> 0), date order (manufacturing ≤ expiry), coordinates,
 risk range (0–100) · indexes on foreign keys, statuses and lookup columns.
 
-## Tables (30)
+## Tables (31)
 
 ### Authentication and access
 | Table | Purpose / key columns |
@@ -17,6 +17,7 @@ risk range (0–100) · indexes on foreign keys, statuses and lookup columns.
 | `permissions` | permission codes (`utils/constants.Perm`) |
 | `user_roles` | user ↔ role (unique pair), assigned_by |
 | `role_permissions` | role ↔ permission (unique pair) |
+| `email_login_codes` | one-time sign-in codes: email, salted SHA-256 hash, expiry, attempts, consumed_at |
 | `login_events` | LOGIN_SUCCESS, LOGIN_UNREGISTERED, LOGIN_DENIED_*, LOGOUT, SESSION_EXPIRED |
 
 ### Organizations

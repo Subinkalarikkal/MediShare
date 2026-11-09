@@ -39,17 +39,21 @@ GENERAL = "GENERAL"
 
 def _email_enabled(session: Session) -> bool:
     setting = session.scalar(select(SystemSetting).where(SystemSetting.key == "notifications.email_enabled"))
-    return bool(setting and setting.value) and bool(get_settings().email_provider_api_key)
+    from services import email_service
+
+    return bool(setting and setting.value) and email_service.is_configured()
 
 
 def _send_email(to: str, subject: str, body: str) -> bool:
-    """Email provider hook. Returns True only when a provider actually accepted it.
+    """Send via SMTP. Returns True only when the mail server accepted the message."""
+    from services import email_service
 
-    No provider SDK is bundled; integrate the chosen provider here. Without a
-    configured provider nothing is sent and delivery is recorded as SKIPPED.
-    """
-    log.info("Email provider integration not configured; email to %s not sent.", to)
-    return False
+    try:
+        email_service.send_email(to, subject, body)
+        return True
+    except (email_service.EmailNotConfigured, email_service.EmailSendError):
+        log.info("Email to %s not sent (provider not configured or unavailable).", to)
+        return False
 
 
 def notify(session: Session, user_id: uuid.UUID, ntype: str, title: str, message: str,

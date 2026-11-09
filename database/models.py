@@ -121,6 +121,20 @@ class RolePermission(Base):
     permission: Mapped[Permission] = relationship()
 
 
+class EmailLoginCode(Base):
+    """One-time email verification codes (stored hashed, short-lived, attempt-limited)."""
+    __tablename__ = "email_login_codes"
+    __table_args__ = (Index("ix_email_code_email_created", "email", "created_at"),)
+    id: Mapped[uuid.UUID] = _pk()
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    salt: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class LoginEvent(Base):
     __tablename__ = "login_events"
     id: Mapped[uuid.UUID] = _pk()

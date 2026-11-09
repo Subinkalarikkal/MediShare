@@ -1,12 +1,11 @@
 # MediShare deployment profile – NON-SECRET settings committed with the code.
 # Priority: environment variables > Streamlit secrets > this file.
 #
-# This repository is deployed as a PUBLIC DEMO (https://medishare.streamlit.app):
-# sample data is loaded automatically and visitors sign in by choosing a sample account.
+# The hosted site (https://medishare.streamlit.app) runs in PRODUCTION mode:
+#   * no sample/demo data and no demo account picker
+#   * sign-in requires proving ownership of an email address with a one-time code
 #
-# For a REAL deployment set APP_ENV = "production" (plus AUTH_MODE = "oidc", DATABASE_URL and the
-# [auth] section) in Streamlit secrets. APP_ENV = "production" always disables the demo login and
-# demo data, whatever this file says. Never put passwords or API keys in this file.
-APP_ENV = "demo"
-AUTH_MODE = "dev"
-DEMO_MODE = true
+# Secrets (SMTP_*, DATABASE_URL, BOOTSTRAP_SUPER_ADMIN_EMAIL, ANTHROPIC_API_KEY, ...) belong in
+# Streamlit Cloud → App settings → Secrets – never in this file. See docs/DEPLOYMENT.md.
+APP_ENV = "production"
+AUTH_MODE = "email"

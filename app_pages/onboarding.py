@@ -9,7 +9,14 @@ from services.errors import ValidationError
 from utils.constants import ROLE_LABELS, Role
 
 email = st.session_state.get("signup_email")
-page_header("Create your MediShare account", f"Signed in as {email}")
+if not email or st.session_state.get("signup_verified") is not True:
+    # Never create an account for an email address whose ownership hasn't been proven.
+    st.session_state.pop("signup_email", None)
+    st.error("Please verify your email address first.")
+    if st.button("Go to sign-in", type="primary"):
+        st.rerun()
+    st.stop()
+page_header("Create your MediShare account", f"Verified email: {email}")
 notice("Individuals can start registering medicines immediately. Organization, collection-centre and reviewer "
        "accounts are restricted until an administrator reviews your application.")
 
@@ -43,11 +50,12 @@ if submitted:
                     location=location, district=district, pin_code=pin or None,
                     professional_registration_number=reg_no, professional_council=council)
                 uid, uemail = user.id, user.email
-            start_session(uid, uemail, "dev" if get_settings().auth_mode == "dev" else "oidc")
+            start_session(uid, uemail, get_settings().auth_mode)
             st.rerun()
         except ValidationError as e:
             st.error("\n".join(f"- {x}" for x in e.errors))
 if st.button("Cancel"):
     clear_auth()
     st.session_state.pop("signup_email", None)
+    st.session_state.pop("signup_verified", None)
     st.rerun()

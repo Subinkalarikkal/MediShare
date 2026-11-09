@@ -40,14 +40,88 @@ def oidc_ready(provider: str) -> tuple[bool, str]:
     return True, ""
 
 
-page_header("Sign in to MediShare", "Secure sign-in with your Google account")
+def email_code_login() -> None:
+    """Two steps: send a one-time code to the email address, then verify it."""
+    from services import email_auth_service as eas
+    from services import email_service
+    from services.errors import ValidationError
+
+    if not email_service.is_configured():
+        log.error("Sign-in unavailable: SMTP is not configured (SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_FROM).")
+        st.error("Sign-in is temporarily unavailable. Please try again later or use the Contact page.")
+        return
+    pending = st.session_state.get("otp_email")
+    if not pending:
+        st.write("Enter your email address. We'll send you a 6-digit code to confirm it's really you – "
+                 "no password needed.")
+        with st.form("otp_request"):
+            email = st.text_input("Email address", placeholder="you@example.com")
+            sent = st.form_submit_button("Send verification code", type="primary", icon=":material/mail:")
+        if sent:
+            try:
+                with db() as s:
+                    eas.request_code(s, email)
+                st.session_state["otp_email"] = email.strip().lower()
+                st.rerun()
+            except ValidationError:
+                st.error("Please enter a valid email address.")
+            except eas.RateLimited as exc:
+                st.error(str(exc))
+            except (email_service.EmailNotConfigured, email_service.EmailSendError):
+                log.exception("Could not send verification email")
+                st.error("We couldn't send the email right now. Please try again in a few minutes.")
+        return
+
+    st.success(f"We sent a 6-digit code to **{pending}**. It expires in 10 minutes. Check your spam folder if "
+               "you don't see it.")
+    with st.form("otp_verify"):
+        code = st.text_input("Verification code", max_chars=6, placeholder="123456")
+        verify = st.form_submit_button("Verify and sign in", type="primary", icon=":material/verified:")
+    if verify:
+        try:
+            with db() as s:
+                verified = eas.verify_code(s, pending, code)
+                res = auth_service.resolve_login(s, verified, provider="email", email_verified=True)
+        except eas.CodeInvalid as exc:
+            st.error(str(exc))
+            return
+        st.session_state.pop("otp_email", None)
+        if res.outcome in {"OK", "PENDING"}:
+            start_session(res.actor.user_id, res.actor.email, "email")
+            st.rerun()
+        elif res.outcome == "UNREGISTERED":
+            st.session_state["signup_email"] = verified
+            st.session_state["signup_verified"] = True  # email ownership proven by the code
+            st.rerun()
+        else:
+            st.error(res.message)
+    c1, c2 = st.columns(2)
+    if c1.button("Send a new code"):
+        try:
+            with db() as s:
+                eas.request_code(s, pending)
+            st.toast("A new code is on its way.")
+        except eas.RateLimited as exc:
+            st.error(str(exc))
+        except (email_service.EmailNotConfigured, email_service.EmailSendError):
+            st.error("We couldn't send the email right now. Please try again in a few minutes.")
+    if c2.button("Use a different email"):
+        st.session_state.pop("otp_email", None)
+        st.rerun()
+
+
+SUBTITLE = {"email": "Secure sign-in with a one-time code sent to your email",
+            "oidc": "Secure sign-in with your Google account"}
+page_header("Sign in to MediShare", SUBTITLE.get(settings.auth_mode, "Development sign-in"))
 
 if err := st.session_state.pop("login_error", None):
     st.error(err)
 
 col, side = st.columns([3, 2])
 with col:
-    if settings.auth_mode == "oidc":
+    if settings.auth_mode == "email":
+        email_code_login()
+    elif settings.auth_mode == "oidc":
         st.write("MediShare uses Google sign-in (OpenID Connect). We only receive your verified email and name.")
         ready, problem = oidc_ready(settings.oidc_provider)
         if ready:
@@ -89,9 +163,11 @@ with col:
                 st.error("Enter a valid email address.")
             else:
                 st.session_state["signup_email"] = new_email.strip().lower()
+                st.session_state["signup_verified"] = True  # local development only (refused in production)
                 st.rerun()
     else:
-        st.error("Development login is disabled in production. Configure AUTH_MODE=oidc.")
+        log.error("No usable sign-in method: AUTH_MODE=%s with APP_ENV=%s", settings.auth_mode, settings.app_env)
+        st.error("Sign-in is temporarily unavailable. Please try again later or use the Contact page.")
 with side:
     notice("Signing in does not grant institutional access by itself. Organization, collection-centre and reviewer "
            "accounts stay restricted until an administrator verifies documents and credentials.")

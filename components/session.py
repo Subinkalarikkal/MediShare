@@ -67,6 +67,7 @@ def start_session(user_id, email: str, provider: str) -> None:
     st.session_state["auth_provider"] = provider
     st.session_state.pop("signup_email", None)
     st.session_state.pop("signup_name", None)
+    st.session_state.pop("signup_verified", None)
 
 
 def clear_auth() -> None:

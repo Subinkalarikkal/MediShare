@@ -19,7 +19,7 @@ def test_upgrade_check_downgrade(tmp_path):
     assert _alembic("upgrade", "head", url=url).returncode == 0
     tables = set(sa.inspect(sa.create_engine(url)).get_table_names()) - {"alembic_version"}
     from database.models import ALL_TABLES
-    assert tables == set(ALL_TABLES) and len(tables) == 30
+    assert tables == set(ALL_TABLES) and len(tables) == 31
     check = _alembic("check", url=url)
     assert check.returncode == 0, check.stdout + check.stderr
     assert _alembic("downgrade", "base", url=url).returncode == 0
@@ -28,5 +28,5 @@ def test_upgrade_check_downgrade(tmp_path):
 def test_postgresql_offline_sql_renders():
     res = _alembic("upgrade", "head", "--sql", url="postgresql+psycopg2://u:p@localhost/medishare")
     assert res.returncode == 0, res.stderr
-    assert res.stdout.count("CREATE TABLE") == 31  # 30 tables + alembic_version
+    assert res.stdout.count("CREATE TABLE") == 32  # 31 tables + alembic_version
     assert "ALTER TABLE users ADD CONSTRAINT fk_users_organization_id" in res.stdout

@@ -33,7 +33,10 @@ def _login_page(with_auth: bool) -> AppTest:
     return at
 
 
-def test_google_button_shown_when_configured(oidc_mode):
+def test_google_button_shown_when_configured(oidc_mode, monkeypatch):
+    import streamlit.auth_util as au
+    # Streamlit's own validator reads .streamlit/secrets.toml from disk; our page checks the values itself.
+    monkeypatch.setattr(au, "validate_auth_credentials", lambda provider: None)
     at = _login_page(with_auth=True)
     assert not at.exception
     labels = [b.label for b in at.button]
@@ -101,35 +104,14 @@ def test_demo_mode_seeds_empty_database_and_shows_banner(monkeypatch, tmp_path):
     connection.get_engine().dispose()
 
 
-def test_committed_demo_profile(monkeypatch):
-    """The committed profile turns on the public demo, but production settings always win."""
+def test_committed_profile_is_production_with_email_verification(monkeypatch):
+    """The hosted site has no demo data/login: production mode with email-code sign-in."""
     from config import Settings
-    for k in ("APP_ENV", "AUTH_MODE", "DEMO_MODE", "MEDISHARE_PROFILE"):
+    for k in ("APP_ENV", "AUTH_MODE", "DEMO_MODE", "MEDISHARE_PROFILE", "DATABASE_URL"):
         monkeypatch.delenv(k, raising=False)
     s = Settings()
-    assert (s.app_env, s.auth_mode, s.demo_mode, s.dev_login_enabled) == ("demo", "dev", True, True)
-    monkeypatch.setenv("APP_ENV", "production")
-    s = Settings()
+    assert (s.app_env, s.auth_mode) == ("production", "email")
     assert s.demo_mode is False and s.dev_login_enabled is False
-    monkeypatch.setenv("MEDISHARE_PROFILE", "none")
-    monkeypatch.delenv("APP_ENV")
-    assert Settings().auth_mode == "oidc"
-
-
-def test_demo_seeds_even_when_bootstrap_already_cached(monkeypatch, tmp_path):
-    """A running server that switches into demo mode (cached bootstrap) must still load sample data."""
-    from database import connection
-    from database.models import User
-    from services import storage_service
-    url = f"sqlite:///{(tmp_path / 'demo2.db').as_posix()}"
-    for k, v in {"DATABASE_URL": url, "APP_ENV": "demo", "AUTH_MODE": "dev", "DEMO_MODE": "true",
-                 "LOCAL_STORAGE_DIR": str(tmp_path / "files")}.items():
-        monkeypatch.setenv(k, v)
-    storage_service.set_backend(storage_service.LocalBackend(str(tmp_path / "files")))
-    connection.configure(url)
-    connection.init_db(create_all=True)  # empty schema; do NOT clear Streamlit's cache
-    at = AppTest.from_file(APP, default_timeout=120).run()
-    assert not at.exception
-    with connection.session_scope() as s:
-        assert s.query(User).count() >= 10
-    connection.get_engine().dispose()
+    assert s.database_url.endswith("/medishare.db")  # never the dev/demo database with SAMPLE data
+    monkeypatch.setenv("AUTH_MODE", "dev")  # even if someone sets dev login, production refuses it
+    assert Settings().dev_login_enabled is False

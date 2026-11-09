@@ -13,7 +13,7 @@ All seven roadmap phases have been implemented and tested (status as of 2026-11-
 | 7 Analytics & deployment | Dashboards, Plotly charts, reports/CSV, notifications, audit logs, tests, Docker, Streamlit deployment config | ✅ |
 
 ## Test results
-`python -m pytest` → **213 passed** (Windows, Python 3.13.9, real Tesseract installed).
+`python -m pytest` → **226 passed** (Windows, Python 3.13.9, real Tesseract installed).
 
 | File | Covers |
 |---|---|

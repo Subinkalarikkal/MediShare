@@ -1,7 +1,12 @@
 # Security
 
 ## Authentication & authorization
-* **OIDC (Google) via `st.login`** is the default (`AUTH_MODE=oidc`). The provider's verified email is mapped to
+* **Email verification (`AUTH_MODE=email`, used by the hosted site):** passwordless sign-in with a 6-digit
+  one-time code emailed to the address. Codes are random (`secrets`), stored only as salted SHA-256 hashes,
+  compared in constant time, expire after 10 minutes, are single-use (requesting a new code invalidates older
+  ones), lock after 5 wrong attempts, and are rate-limited to 3 per 15 minutes / 10 per day per address. Sign-up
+  is only possible after verification – the onboarding page refuses any email not verified in this session.
+* **OIDC (Google) via `st.login`** (`AUTH_MODE=oidc`) is also supported. The provider's verified email is mapped to
   a database user (`auth_service.resolve_login`); unverified provider emails are refused.
 * Authentication ≠ authorization: a successful login grants nothing beyond the user's database roles; new
   institutional and reviewer accounts are `PENDING` (restricted).

@@ -39,7 +39,7 @@ With no `DATABASE_URL`, a local SQLite database is used. The included `.env` (gi
 | `ngo@…` | NGO / healthcare organization |
 | `centre@…` | Collection centre operator (3 centres) |
 
-Development login is refused when `APP_ENV=production`; the default `AUTH_MODE` is `oidc` (Google).
+Development login is refused when `APP_ENV=production`. The hosted site uses **email verification** (a one-time code sent to the user's email) – see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 **Optional:** set `ANTHROPIC_API_KEY` to enable Claude label reading and the AI analytics narrative. Without it,
 OCR (Tesseract) and deterministic database answers are used, and the UI says so.
@@ -47,7 +47,7 @@ OCR (Tesseract) and deterministic database answers are used, and the UI says so.
 ## Tests
 
 ```bash
-python -m pytest            # 213 tests: services, safety acceptance, AI, migrations, Streamlit AppTest UI
+python -m pytest            # 226 tests: services, safety acceptance, AI, migrations, Streamlit AppTest UI
 ```
 
 ## Project layout

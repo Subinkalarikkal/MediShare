@@ -22,9 +22,49 @@ settings = get_settings()
 
 @st.cache_resource(show_spinner=False)
 def _bootstrap() -> bool:
-    # Production schema is managed by Alembic; create_all is a dev/test convenience.
+    # Production schema is managed by Alembic migrations; create_all is a dev/test convenience.
+    if settings.is_production:
+        from pathlib import Path
+
+        from alembic import command
+        from alembic.config import Config
+
+        root = Path(__file__).resolve().parent
+        cfg = Config(str(root / "alembic.ini"))
+        cfg.set_main_option("script_location", str(root / "alembic"))
+        from sqlalchemy import inspect
+
+        from database.connection import get_engine
+
+        tables = set(inspect(get_engine()).get_table_names())
+        if "users" in tables and "alembic_version" not in tables:
+            # Schema was created without Alembic (older version / create_all): adopt it, don't re-create it.
+            from database.models import Base
+
+            complete = set(Base.metadata.tables) <= tables
+            command.stamp(cfg, "head" if complete else "964a65b7ecac")
+        command.upgrade(cfg, "head")
     init_db(create_all=not settings.is_production)
+    _bootstrap_first_admin()
     return True
+
+
+def _bootstrap_first_admin() -> None:
+    """Create the first super administrator from BOOTSTRAP_SUPER_ADMIN_EMAIL (a secret), once.
+
+    That person still has to prove ownership of the email (code / Google) to sign in.
+    """
+    email = settings.bootstrap_super_admin_email
+    if not email:
+        return
+    from database.connection import session_scope
+    from services.errors import PermissionDenied, ValidationError
+
+    try:
+        with session_scope() as s:
+            auth_service.bootstrap_super_admin(s, email, "Super Administrator")
+    except (PermissionDenied, ValidationError):
+        pass  # a super admin already exists (or the email is invalid)
 
 
 @st.cache_resource(show_spinner=False)
@@ -84,6 +124,7 @@ def _sync_oidc() -> None:
         start_session(res.actor.user_id, res.actor.email, "oidc")
     elif res.outcome == "UNREGISTERED":
         st.session_state["signup_email"] = str(email).lower()
+        st.session_state["signup_verified"] = True  # Google verified the email (unverified emails are refused)
         st.session_state["signup_name"] = st.user.get("name") or ""
     else:
         st.session_state["login_error"] = res.message

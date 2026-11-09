@@ -1,20 +1,29 @@
 # Deployment
 
-## Public demo on Streamlit Community Cloud (sample data)
-For showcasing the project without any external accounts:
-1. share.streamlit.io → **Create app** → repository `MediShare`, branch `main`, main file `app.py`.
-2. No secrets are needed: the committed `medishare_profile.toml` already selects demo mode. (Equivalent
-   Secrets, if you prefer to set them explicitly:)
-   ```toml
-   APP_ENV = "demo"
-   AUTH_MODE = "dev"
-   DEMO_MODE = "true"
-   ```
-3. Deploy. On first start the app creates a SQLite database and loads the `[SAMPLE]` data; visitors sign in by
-   choosing a sample account. Everything resets when the app restarts or sleeps.
+## Hosted site (https://medishare.streamlit.app) – production with email verification
+The committed `medishare_profile.toml` sets `APP_ENV="production"` and `AUTH_MODE="email"`: no sample data, no demo
+login, and every sign-in / sign-up requires a 6-digit code emailed to the address. Database migrations run
+automatically on startup.
 
-Demo mode is for showcasing only: anyone can sign in as any sample account (including the super admin), and
-the filesystem is temporary. Never enter real data. Demo mode is ignored when `APP_ENV="production"`.
+Add these in Streamlit Cloud → your app → **⋮ → Settings → Secrets** (then Save; the app restarts):
+```toml
+# Email (required for sign-in). Gmail example – create an App Password at https://myaccount.google.com/apppasswords
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "587"
+SMTP_USER = "your-address@gmail.com"
+SMTP_PASSWORD = "your 16-character app password"
+SMTP_FROM = "MediShare <your-address@gmail.com>"
+
+# First super administrator (signs in with an emailed code like everyone else)
+BOOTSTRAP_SUPER_ADMIN_EMAIL = "your-address@gmail.com"
+
+# Permanent database (strongly recommended – without it data is lost when the app restarts)
+DATABASE_URL = "postgresql+psycopg2://USER:PASSWORD@HOST/DBNAME?sslmode=require"
+```
+Without `DATABASE_URL` the app uses a SQLite file on Streamlit's temporary disk, which is wiped on every restart
+or redeploy. A free PostgreSQL database is available from e.g. Neon (https://neon.tech).
+
+The previous public demo can still be run locally (`APP_ENV=demo`, `AUTH_MODE=dev`, `DEMO_MODE=true`).
 
 ## Streamlit Community Cloud (prototype)
 > For a real deployment, set `APP_ENV = "production"` in Secrets – this overrides `medishare_profile.toml`
