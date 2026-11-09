@@ -24,18 +24,39 @@ settings = get_settings()
 def _bootstrap() -> bool:
     # Production schema is managed by Alembic; create_all is a dev/test convenience.
     init_db(create_all=not settings.is_production)
-    if settings.demo_mode:  # public showcase: load clearly-labelled sample data into an empty database
-        from database.connection import session_scope
-        from database.models import User
-        from scripts.seed_demo import seed
-
-        with session_scope() as s:
-            if s.query(User).count() == 0:
-                seed(s)
     return True
 
 
+@st.cache_resource(show_spinner=False)
+def _demo_seed_lock():
+    import threading
+
+    return threading.Lock()
+
+
+def _ensure_demo_data() -> None:
+    """Public showcase: load clearly-labelled sample data into an empty database.
+
+    Checked once per browser session (cheap COUNT query) rather than inside the cached
+    bootstrap, so it also works when a running server switches into demo mode or the
+    database file is reset. The lock stops two first visitors from seeding twice.
+    """
+    if not settings.demo_mode or st.session_state.get("_demo_data_checked"):
+        return
+    from database.connection import session_scope
+    from database.models import User
+    from scripts.seed_demo import seed
+
+    with _demo_seed_lock():
+        with session_scope() as s:
+            if s.query(User).count() == 0:
+                with st.spinner("Preparing the demo with sample data…"):
+                    seed(s)
+    st.session_state["_demo_data_checked"] = True
+
+
 _bootstrap()
+_ensure_demo_data()
 apply_theme()
 if settings.demo_mode:
     st.info("**Public demo** – all accounts and records are SAMPLE data and reset when the app restarts. "

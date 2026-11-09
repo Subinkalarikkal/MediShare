@@ -114,3 +114,22 @@ def test_committed_demo_profile(monkeypatch):
     monkeypatch.setenv("MEDISHARE_PROFILE", "none")
     monkeypatch.delenv("APP_ENV")
     assert Settings().auth_mode == "oidc"
+
+
+def test_demo_seeds_even_when_bootstrap_already_cached(monkeypatch, tmp_path):
+    """A running server that switches into demo mode (cached bootstrap) must still load sample data."""
+    from database import connection
+    from database.models import User
+    from services import storage_service
+    url = f"sqlite:///{(tmp_path / 'demo2.db').as_posix()}"
+    for k, v in {"DATABASE_URL": url, "APP_ENV": "demo", "AUTH_MODE": "dev", "DEMO_MODE": "true",
+                 "LOCAL_STORAGE_DIR": str(tmp_path / "files")}.items():
+        monkeypatch.setenv(k, v)
+    storage_service.set_backend(storage_service.LocalBackend(str(tmp_path / "files")))
+    connection.configure(url)
+    connection.init_db(create_all=True)  # empty schema; do NOT clear Streamlit's cache
+    at = AppTest.from_file(APP, default_timeout=120).run()
+    assert not at.exception
+    with connection.session_scope() as s:
+        assert s.query(User).count() >= 10
+    connection.get_engine().dispose()
