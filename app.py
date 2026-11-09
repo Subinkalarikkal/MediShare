@@ -24,11 +24,22 @@ settings = get_settings()
 def _bootstrap() -> bool:
     # Production schema is managed by Alembic; create_all is a dev/test convenience.
     init_db(create_all=not settings.is_production)
+    if settings.demo_mode:  # public showcase: load clearly-labelled sample data into an empty database
+        from database.connection import session_scope
+        from database.models import User
+        from scripts.seed_demo import seed
+
+        with session_scope() as s:
+            if s.query(User).count() == 0:
+                seed(s)
     return True
 
 
 _bootstrap()
 apply_theme()
+if settings.demo_mode:
+    st.info("**Public demo** – all accounts and records are SAMPLE data and reset when the app restarts. "
+            "Do not enter real personal or medical information.", icon=":material/science:")
 
 
 def _sync_oidc() -> None:

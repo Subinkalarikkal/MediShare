@@ -47,7 +47,9 @@ def render_sidebar(actor: Actor | None) -> None:
             unsafe_allow_html=True)
         if unread:
             st.caption(f"🔔 {unread} unread notification(s)")
-        if get_settings().dev_login_enabled:
+        if get_settings().demo_mode:
+            st.caption("🧪 Public demo – sample data only.")
+        elif get_settings().dev_login_enabled:
             st.caption("⚠️ Development login mode – not for production use.")
         if st.button("Log out", icon=":material/logout:", width="stretch"):
             logout(actor)

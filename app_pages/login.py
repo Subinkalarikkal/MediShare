@@ -57,8 +57,12 @@ with col:
             log.error("Sign-in unavailable: %s", problem)
             st.error("Sign-in is temporarily unavailable. Please try again later or use the Contact page.")
     elif settings.dev_login_enabled:
-        st.warning("**Development login mode.** Identity is not verified. Use only with seeded sample data. "
-                   "Set AUTH_MODE=oidc for real deployments – this mode is refused when APP_ENV=production.")
+        if settings.demo_mode:
+            st.info("**Demo sign-in.** Pick any sample account below to explore that role. No password is needed "
+                    "because every account here is sample data.")
+        else:
+            st.warning("**Development login mode.** Identity is not verified. Use only with seeded sample data. "
+                       "Set AUTH_MODE=oidc for real deployments – this mode is refused when APP_ENV=production.")
         with db() as s:
             users = s.scalars(select(User).where(User.deleted_at.is_(None)).order_by(User.full_name)).all()
             options = {}

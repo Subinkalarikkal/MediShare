@@ -67,3 +67,35 @@ def test_tracebacks_hidden_from_visitors():
     import tomllib
     cfg = tomllib.loads((ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8"))
     assert cfg["client"]["showErrorDetails"] == "none"
+
+
+def test_demo_mode_never_in_production(monkeypatch):
+    from config import Settings
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("APP_ENV", "production")
+    assert Settings().demo_mode is False
+    monkeypatch.setenv("APP_ENV", "demo")
+    assert Settings().demo_mode is True
+
+
+def test_demo_mode_seeds_empty_database_and_shows_banner(monkeypatch, tmp_path):
+    """Simulates a fresh Streamlit Cloud start: empty DB → sample data loaded, demo banner shown."""
+    from database import connection
+    from database.models import User
+    from services import storage_service
+    url = f"sqlite:///{(tmp_path / 'demo.db').as_posix()}"
+    for k, v in {"DATABASE_URL": url, "APP_ENV": "demo", "AUTH_MODE": "dev", "DEMO_MODE": "true",
+                 "LOCAL_STORAGE_DIR": str(tmp_path / "files")}.items():
+        monkeypatch.setenv(k, v)
+    storage_service.set_backend(storage_service.LocalBackend(str(tmp_path / "files")))
+    connection.configure(url)
+    import streamlit as st
+    st.cache_resource.clear()  # force the app's one-time bootstrap to run again
+    at = AppTest.from_file(APP, default_timeout=120).run()
+    assert not at.exception
+    assert any("Public demo" in i.value for i in at.info)
+    with connection.session_scope() as s:
+        assert s.query(User).filter(User.email.like("%@sample.medishare.in")).count() >= 10
+    at.switch_page("app_pages/login.py").run()
+    assert at.selectbox and any(b.label == "Sign in" for b in at.button)
+    connection.get_engine().dispose()

@@ -1,5 +1,20 @@
 # Deployment
 
+## Public demo on Streamlit Community Cloud (sample data)
+For showcasing the project without any external accounts:
+1. share.streamlit.io → **Create app** → repository `MediShare`, branch `main`, main file `app.py`.
+2. **Advanced settings → Secrets**, paste:
+   ```toml
+   APP_ENV = "demo"
+   AUTH_MODE = "dev"
+   DEMO_MODE = "true"
+   ```
+3. Deploy. On first start the app creates a SQLite database and loads the `[SAMPLE]` data; visitors sign in by
+   choosing a sample account. Everything resets when the app restarts or sleeps.
+
+Demo mode is for showcasing only: anyone can sign in as any sample account (including the super admin), and
+the filesystem is temporary. Never enter real data. Demo mode is ignored when `APP_ENV="production"`.
+
 ## Streamlit Community Cloud (prototype)
 1. Push the repository to GitHub (secrets are git-ignored).
 2. New app → entry point `app.py`, Python 3.11+. `requirements.txt` (pinned, includes `Authlib`, which Google sign-in needs) and `packages.txt`

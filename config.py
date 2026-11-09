@@ -87,6 +87,11 @@ class Settings:
         return self.auth_mode == "dev" and not self.is_production
 
     @property
+    def demo_mode(self) -> bool:
+        """Public showcase: auto-seed SAMPLE data and use the demo login. Never in production."""
+        return _bool("DEMO_MODE", False) and not self.is_production
+
+    @property
     def claude_enabled(self) -> bool:
         return bool(self.anthropic_api_key) and self.ai_external_processing_enabled
 
