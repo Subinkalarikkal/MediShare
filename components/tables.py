@@ -20,7 +20,7 @@ def show_table(rows, columns: list[str] | None = None, empty: str = "No records 
         df = df[[c for c in columns if c in df.columns]]
     df = df.drop(columns=[c for c in hide if c in df.columns])
     for c in df.columns:
-        if df[c].dtype == object:
+        if df[c].dtype == object or pd.api.types.is_string_dtype(df[c]):  # pandas 3 uses a "str" dtype
             df[c] = df[c].apply(lambda v: v.replace("_", " ") if isinstance(v, str) and v.isupper() else v)
     if "sample" in df.columns:
         df["sample"] = df["sample"].map({True: "Sample", False: ""})
