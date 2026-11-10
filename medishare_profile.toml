@@ -9,3 +9,9 @@
 # Streamlit Cloud → App settings → Secrets – never in this file. See docs/DEPLOYMENT.md.
 APP_ENV = "production"
 AUTH_MODE = "email"
+
+# Built-in super administrator (password sign-in). Only the Argon2id HASH of the password is stored here;
+# the password itself is not in this repository. It is recreated at start-up only if it doesn't exist.
+ADMIN_USERNAME = "medishare.admin"
+ADMIN_EMAIL = "superadmin@medishare.invalid"
+ADMIN_PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$PN0dnIXxQl7vxdZG+8FsHw$qu18Upi2rRe0IWVDnsDbhiDtEbS5hNdRbP37+zArXXU"

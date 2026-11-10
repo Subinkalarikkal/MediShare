@@ -21,7 +21,7 @@ settings = get_settings()
 
 
 @st.cache_resource(show_spinner=False)
-def _bootstrap(schema_head: str, db_url: str) -> bool:
+def _bootstrap(schema_head: str, db_url: str, admin_seed: str) -> bool:
     """Bring the database schema up to date, seed reference data and the first admin.
 
     Cached per (latest migration, database URL): when a deploy adds a migration, a
@@ -40,12 +40,22 @@ def _bootstrap_first_admin() -> None:
 
     That person still has to prove ownership of the email (code / Google) to sign in.
     """
-    email = settings.bootstrap_super_admin_email
-    if not email:
-        return
     from database.connection import session_scope
     from services.errors import PermissionDenied, ValidationError
 
+    if settings.admin_username and settings.admin_password_hash:
+        try:
+            with session_scope() as s:
+                auth_service.ensure_seed_admin(s, settings.admin_username,
+                                               settings.admin_email or f"{settings.admin_username}@medishare.invalid",
+                                               settings.admin_password_hash)
+        except ValidationError:
+            import logging
+
+            logging.getLogger("medishare").error("ADMIN_PASSWORD_HASH is not a valid Argon2id hash; admin not created.")
+    email = settings.bootstrap_super_admin_email
+    if not email:
+        return
     try:
         with session_scope() as s:
             auth_service.bootstrap_super_admin(s, email, "Super Administrator")
@@ -84,7 +94,8 @@ def _ensure_demo_data() -> None:
 from database.connection import get_engine  # noqa: E402
 from database.migrations import head_revision  # noqa: E402
 
-_bootstrap(head_revision(), get_engine().url.render_as_string(hide_password=True))
+_bootstrap(head_revision(), get_engine().url.render_as_string(hide_password=True),
+           f"{settings.admin_username}|{(settings.admin_password_hash or '')[-12:]}")
 _ensure_demo_data()
 apply_theme()
 if settings.demo_mode:

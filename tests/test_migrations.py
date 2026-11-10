@@ -57,5 +57,5 @@ def test_startup_upgrades_old_untracked_database(tmp_path, monkeypatch):
 def test_bootstrap_cache_is_keyed_by_schema_version():
     import inspect as pyinspect
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "def _bootstrap(schema_head: str, db_url: str)" in src
+    assert "def _bootstrap(schema_head: str, db_url: str, admin_seed: str)" in src
     assert "_bootstrap(head_revision()," in src

@@ -20,6 +20,13 @@ BOOTSTRAP_SUPER_ADMIN_EMAIL = "your-address@gmail.com"
 # Permanent database (strongly recommended – without it data is lost when the app restarts)
 DATABASE_URL = "postgresql+psycopg2://USER:PASSWORD@HOST/DBNAME?sslmode=require"
 ```
+**Built-in administrator.** `medishare_profile.toml` defines `ADMIN_USERNAME` (`medishare.admin`) and the
+Argon2id hash of its password (`ADMIN_PASSWORD_HASH`); the password itself is not stored anywhere in the repository.
+The account is created at start-up only if it doesn't exist and is never overwritten. To rotate the password,
+generate a new hash (`python -c "from services.auth_service import hash_password; print(hash_password('NEW'))"`)
+and replace `ADMIN_PASSWORD_HASH` (or set it in Streamlit Secrets, which take priority). The account's email is a
+non-deliverable placeholder, so it cannot use email codes or Forgot password – it signs in with its password.
+
 Without `DATABASE_URL` the app uses a SQLite file on Streamlit's temporary disk, which is wiped on every restart
 or redeploy. A free PostgreSQL database is available from e.g. Neon (https://neon.tech).
 

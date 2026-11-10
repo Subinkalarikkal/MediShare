@@ -163,11 +163,43 @@ def register_user(session: Session, *, email: str, full_name: str, account_type:
     return user
 
 
+def ensure_seed_admin(session: Session, username: str, email: str, password_hash: str,
+                      full_name: str = "MediShare Administrator") -> User | None:
+    """Create the configured super administrator if it does not exist yet.
+
+    Never modifies an existing account, so a password changed in Profile is kept (as long as the
+    database persists). Only an Argon2id hash is accepted – never a plain password.
+    """
+    if not (username and email and password_hash):
+        return None
+    if not password_hash.startswith("$argon2id$"):
+        raise ValidationError("ADMIN_PASSWORD_HASH must be an Argon2id hash.")
+    uname = username.strip().lower()
+    mail = email.strip().lower()
+    from sqlalchemy import func, or_
+
+    exists = session.scalar(select(User).where(or_(func.lower(User.username) == uname, User.email == mail)))
+    if exists:
+        return None
+    user = User(email=mail, full_name=full_name, username=uname, password_hash=password_hash,
+                status=AccountStatus.ACTIVE.value)
+    session.add(user)
+    session.flush()
+    _assign_role(session, user, RoleCode.SUPER_ADMIN.value)
+    audit(session, user.id, "SEED_ADMIN_CREATED", "user", user.id, after={"username": uname})
+    return user
+
+
 def bootstrap_super_admin(session: Session, email: str, full_name: str) -> User:
     """Secure bootstrap: only works while no SUPER_ADMIN exists. Run from the CLI script."""
-    existing = session.scalar(
-        select(UserRole).join(Role, Role.id == UserRole.role_id).where(Role.code == RoleCode.SUPER_ADMIN.value)
-    )
+    from config import get_settings
+
+    seed = (get_settings().admin_username or "").strip().lower()
+    q = (select(UserRole).join(Role, Role.id == UserRole.role_id).join(User, User.id == UserRole.user_id)
+         .where(Role.code == RoleCode.SUPER_ADMIN.value))
+    if seed:
+        q = q.where((User.username.is_(None)) | (User.username != seed))
+    existing = session.scalar(q)
     if existing:
         raise PermissionDenied("A super administrator already exists; bootstrap is disabled.")
     errors: list[str] = []

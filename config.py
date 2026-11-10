@@ -107,6 +107,11 @@ class Settings:
     bootstrap_super_admin_email: str | None = field(
         default_factory=lambda: _secret("BOOTSTRAP_SUPER_ADMIN_EMAIL")
     )
+    # Built-in administrator for password sign-in. Only an Argon2id HASH is ever configured –
+    # the password itself is never stored in code, settings or the database.
+    admin_username: str | None = field(default_factory=lambda: _secret("ADMIN_USERNAME"))
+    admin_email: str | None = field(default_factory=lambda: _secret("ADMIN_EMAIL"))
+    admin_password_hash: str | None = field(default_factory=lambda: _secret("ADMIN_PASSWORD_HASH"))
 
     @property
     def is_production(self) -> bool:
