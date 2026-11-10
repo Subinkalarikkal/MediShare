@@ -6,9 +6,57 @@ Authorization: role-based navigation here, enforced again in every service.
 """
 from __future__ import annotations
 
+import os
+import sys
+import threading
+import types
+
 import streamlit as st
 
 st.set_page_config(page_title="MediShare", page_icon="💊", layout="wide", initial_sidebar_state="expanded")
+
+_PROJECT_PACKAGES = ("config", "database", "services", "ai", "components", "utils", "scripts")
+
+
+def _reload_stale_project_modules() -> None:
+    """Pick up newly deployed code without a server restart.
+
+    Streamlit re-reads this entry script on every run, but other project modules stay cached in
+    sys.modules. After a git pull on Streamlit Cloud that mixes new and old code. When any project
+    file changes, drop the project modules (they re-import fresh below) and clear cached resources.
+    """
+    if os.getenv("MEDISHARE_HOT_RELOAD", "1") == "0":  # test suite: modules are configured/patched in-process
+        return
+    root = os.path.dirname(os.path.abspath(__file__))
+    stamp = []
+    for pkg in _PROJECT_PACKAGES:
+        base = os.path.join(root, pkg)
+        paths = [base + ".py"] if os.path.isfile(base + ".py") else [
+            os.path.join(d, f) for d, _, files in os.walk(base) for f in files if f.endswith(".py")]
+        for path in paths:
+            try:
+                st_ = os.stat(path)
+                stamp.append((path, st_.st_mtime_ns, st_.st_size))
+            except OSError:
+                pass
+    version = hash(tuple(sorted(stamp)))
+    state = sys.modules.setdefault("_medishare_code_state", types.ModuleType("_medishare_code_state"))
+    lock = state.__dict__.setdefault("lock", threading.Lock())
+    with lock:
+        previous = getattr(state, "version", None)
+        if previous == version:
+            return
+        already_loaded = any(n.split(".")[0] in _PROJECT_PACKAGES for n in sys.modules)
+        if previous is not None or already_loaded:  # first run after a hot deploy: modules may be stale
+            for name in list(sys.modules):
+                if name.split(".")[0] in _PROJECT_PACKAGES:
+                    del sys.modules[name]
+            st.cache_resource.clear()
+            st.cache_data.clear()
+        state.version = version
+
+
+_reload_stale_project_modules()
 
 from components.header import apply_theme  # noqa: E402
 from components.session import clear_auth, current_actor, db, show_flash, start_session  # noqa: E402
